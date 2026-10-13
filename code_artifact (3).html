@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="ru" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Монитор доступности сайтов | Uptime Dashboard</title>
+    <!-- Favicon: Server / Status icon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <!-- Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Custom scrollbar and animations */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.05);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(156, 163, 175, 0.5);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(156, 163, 175, 0.8);
+        }
+        @keyframes pulse-slow {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .animate-pulse-slow {
+            animation: pulse-slow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+    </style>
+</head>
+<body class="h-full bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans antialiased transition-colors duration-300 flex flex-col">
+
+    <header class="sticky top-0 z-50 backdrop-blur-md bg-white/80 dark:bg-slate-900/80 border-b border-slate-200 dark:border-slate-800">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-lg shadow-indigo-500/30">
+                    <i class="fa-solid fa-server text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg leading-tight">Монитор Серверов</h1>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Проверка доступности в реальном времени</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-3">
+                <div id="statusBadgeHeader" class="hidden sm:flex items-center space-x-2 px-3 py-1 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                    <span>Система активна</span>
+                </div>
+                
+                <button onclick="toggleDarkMode()" aria-label="Переключить тему" class="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                    <i id="themeIcon" class="fa-solid fa-moon"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+
+        <!-- Notification Toast -->
+        <div id="toast" class="fixed bottom-6 right-6 z-50 transform translate-y-24 opacity-0 transition-all duration-300 bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-4 py-3 rounded-xl shadow-2xl flex items-center space-x-3 border border-slate-800 dark:border-slate-200 text-sm font-medium">
+            <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400"></i>
+            <span id="toastMessage">Уведомление</span>
+        </div>
+
+        <!-- Summary Statistics Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+            <!-- Total -->
+            <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Всего сайтов</p>
+                    <h3 id="statTotal" class="text-2xl font-bold mt-1">12</h3>
+                </div>
+                <div class="w-12 h-12 rounded-xl bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-globe"></i>
+                </div>
+            </div>
+
+            <!-- Online -->
+            <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Онлайн</p>
+                    <h3 id="statOnline" class="text-2xl font-bold mt-1 text-emerald-600 dark:text-emerald-400">0</h3>
+                </div>
+                <div class="w-12 h-12 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-circle-check"></i>
+                </div>
+            </div>
+
+            <!-- Offline -->
+            <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Оффлайн</p>
+                    <h3 id="statOffline" class="text-2xl font-bold mt-1 text-rose-600 dark:text-rose-400">0</h3>
+                </div>
+                <div class="w-12 h-12 rounded-xl bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-circle-xmark"></i>
+                </div>
+            </div>
+
+            <!-- Avg Response -->
+            <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Средний пинг</p>
+                    <h3 id="statPing" class="text-2xl font-bold mt-1">0 мс</h3>
+                </div>
+                <div class="w-12 h-12 rounded-xl bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-bolt"></i>
+                </div>
+            </div>
+
+            <!-- Health Percentage -->
+            <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between sm:col-span-2 lg:col-span-1">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Доступность</p>
+                    <h3 id="statHealth" class="text-2xl font-bold mt-1">100%</h3>
+                </div>
+                <div class="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-shield-halved"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
+            
+            <!-- Search & Filters -->
+            <div class="flex flex-col sm:flex-row items-center w-full md:w-auto gap-3">
+                <!-- Search Box -->
+                <div class="relative w-full sm:w-64">
+                    <span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
+                        <i class="fa-solid fa-search"></i>
+                    </span>
+                    <input type="text" id="searchInput" oninput="filterSites()" placeholder="Поиск по URL или названию..." 
+                        class="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white">
+                </div>
+
+                <!-- Status Filter Buttons -->
+                <div class="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl w-full sm:w-auto overflow-x-auto">
+                    <button onclick="setFilter('all')" id="filterBtn-all" class="flex-1 sm:flex-none px-4 py-1.5 text-xs font-semibold rounded-lg bg-white dark:bg-slate-700 shadow-sm transition-all text-indigo-600 dark:text-white">Все</button>
+                    <button onclick="setFilter('online')" id="filterBtn-online" class="flex-1 sm:flex-none px-4 py-1.5 text-xs font-semibold rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all">Онлайн</button>
+                    <button onclick="setFilter('offline')" id="filterBtn-offline" class="flex-1 sm:flex-none px-4 py-1.5 text-xs font-semibold rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all">Оффлайн</button>
+                </div>
+            </div>
+
+            <!-- Actions & Auto-refresh -->
+            <div class="flex items-center justify-between w-full md:w-auto gap-3">
+                <div class="flex items-center space-x-2 text-xs text-slate-500 dark:text-slate-400">
+                    <i class="fa-regular fa-clock"></i>
+                    <span id="countdownText">Обновление через 30 мин</span>
+                </div>
+
+                <div class="flex items-center space-x-2">
+                    <button onclick="openAddModal()" class="flex items-center space-x-2 px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-sm font-medium transition-all">
+                        <i class="fa-solid fa-plus"></i>
+                        <span class="hidden sm:inline">Добавить</span>
+                    </button>
+                    <button onclick="checkAllSites(true)" id="refreshBtn" class="flex items-center space-x-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-medium shadow-lg shadow-indigo-600/25 transition-all active:scale-95">
+                        <i id="refreshIcon" class="fa-solid fa-rotate"></i>
+                        <span>Проверить</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="sitesGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            <!-- Site cards will be dynamically injected here -->
+        </div>
+
+        <!-- Empty state when search returns nothing -->
+        <div id="emptyState" class="hidden flex flex-col items-center justify-center py-16 text-center">
+            <div class="w-16 h-16 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 text-2xl mb-4">
+                <i class="fa-solid fa-face-frown"></i>
+            </div>
+            <h3 class="text-lg font-bold">Ничего не найдено</h3>
+            <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">По вашему запросу сайтов не обнаружено.</p>
+        </div>
+
+    </main>
+
+    <!-- Modal: Add / Edit Site -->
+    <div id="siteModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 w-full max-w-md p-6 shadow-2xl transform scale-95 transition-transform duration-300">
+            <div class="flex items-center justify-between mb-4">
+                <h3 id="modalTitle" class="text-lg font-bold">Добавить сайт</h3>
+                <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <form id="siteForm" onsubmit="handleSiteFormSubmit(event)" class="space-y-4">
+                <input type="hidden" id="modalSiteId">
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Название (имя)</label>
+                    <input type="text" id="modalInputName" placeholder="например, Корпоративный портал" required
+                        class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">URL адрес</label>
+                    <input type="url" id="modalInputUrl" placeholder="https://example.com" required
+                        class="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white">
+                </div>
+                <div class="flex items-center justify-end space-x-3 pt-2">
+                    <button type="button" onclick="closeModal()" class="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-sm font-medium transition-colors">Отмена</button>
+                    <button type="submit" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-medium shadow-lg shadow-indigo-600/25 transition-all">Сохранить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <footer class="mt-auto border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 py-6 text-center text-xs text-slate-500 dark:text-slate-400">
+        <div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <p>© 2026 Монитор доступности сайтов. Все права защищены.</p>
+            <div class="flex items-center space-x-4">
+                <span class="flex items-center space-x-1.5">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    <span>Автопроверка каждые 30 мин</span>
+                </span>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        const defaultRawSites = [
+            { name: "TK-UG Main", url: "https://all.tk-ug.ru/" },
+            { name: "TK-UG 1", url: "http://all1.tk-ug.ru/" },
+            { name: "Sintezr C4", url: "http://all.c4.sintezr.ru/" },
+            { name: "Sintezr C12", url: "http://all.c12.sintezr.ru/" },
+            { name: "Sintezr C19", url: "http://all.c19.sintezr.ru/" },
+            { name: "Sintezr C21", url: "http://all.c21.sintezr.ru/" },
+            { name: "Sintezr C22", url: "http://all.c22.sintezr.ru/" },
+            { name: "Sintezr C25", url: "http://all.c25.sintezr.ru/" },
+            { name: "Sintezr C31", url: "http://all.c31.sintezr.ru/" },
+            { name: "Sintezr C34", url: "http://all.c34.sintezr.ru/" },
+            { name: "Sintezr C36", url: "http://all.c36.sintezr.ru/" },
+            { name: "Gazkrd A", url: "http://a.gazkrd.ru/" }
+        ];
+
+        let sites = [];
+        let currentFilter = 'all';
+        let searchQuery = '';
+        
+        // 30 minutes in seconds = 30 * 60 = 1800 seconds
+        const CHECK_INTERVAL_SECONDS = 30 * 60;
+        let countdownTimer = CHECK_INTERVAL_SECONDS;
+        let countdownInterval = null;
+        let isCheckingAll = false;
+
+        function initSites() {
+            let loadedSites = [];
+            try {
+                const stored = localStorage.getItem('uptime_custom_sites_v3');
+                if (stored) {
+                    loadedSites = JSON.parse(stored);
+                }
+            } catch(e) {}
+
+            if (!loadedSites || loadedSites.length === 0) {
+                loadedSites = defaultRawSites.map((item, idx) => ({
+                    id: 'site_' + (Date.now() + idx),
+                    name: item.name,
+                    url: item.url
+                }));
+            }
+
+            sites = loadedSites.map((item) => {
+                let savedHistory = [];
+                try {
+                    const storedHist = localStorage.getItem(`uptime_history_${item.id}`);
+                    if (storedHist) savedHistory = JSON.parse(storedHist);
+                } catch(e) {}
+
+                return {
+                    id: item.id || ('site_' + Math.random().toString(36).substring(2, 9)),
+                    name: item.name,
+                    url: item.url,
+                    status: 'checking',
+                    latency: 0,
+                    statusCode: '-',
+                    lastChecked: '-',
+                    history: savedHistory.length ? savedHistory : Array(10).fill('unknown')
+                };
+            });
+            saveSitesToStorage();
+        }
+
+        function saveSitesToStorage() {
+            try {
+                const lightweight = sites.map(s => ({ id: s.id, name: s.name, url: s.url }));
+                localStorage.setItem('uptime_custom_sites_v3', JSON.stringify(lightweight));
+            } catch(e) {}
+        }
+
+        function saveHistory(id, history) {
+            try {
+                localStorage.setItem(`uptime_history_${id}`, JSON.stringify(history));
+            } catch(e) {}
+        }
+
+        function renderDashboard() {
+            renderStats();
+            renderSitesGrid();
+        }
+
+        function renderStats() {
+            const total = sites.length;
+            const online = sites.filter(s => s.status === 'online').length;
+            const offline = sites.filter(s => s.status === 'offline').length;
+            
+            const activeLatencies = sites.filter(s => s.status === 'online' && s.latency > 0).map(s => s.latency);
+            const avgPing = activeLatencies.length ? Math.round(activeLatencies.reduce((a, b) => a + b, 0) / activeLatencies.length) : 0;
+            
+            const health = total > 0 ? Math.round((online / total) * 100) : 100;
+
+            document.getElementById('statTotal').innerText = total;
+            document.getElementById('statOnline').innerText = online;
+            document.getElementById('statOffline').innerText = offline;
+            document.getElementById('statPing').innerText = avgPing > 0 ? `${avgPing} мс` : '0 мс';
+            document.getElementById('statHealth').innerText = `${health}%`;
+        }
+
+        function renderSitesGrid() {
+            const grid = document.getElementById('sitesGrid');
+            const emptyState = document.getElementById('emptyState');
+            
+            let filtered = sites.filter(site => {
+                const matchesSearch = site.url.toLowerCase().includes(searchQuery.toLowerCase()) || site.name.toLowerCase().includes(searchQuery.toLowerCase());
+                if (currentFilter === 'online') return matchesSearch && site.status === 'online';
+                if (currentFilter === 'offline') return matchesSearch && site.status === 'offline';
+                return matchesSearch;
+            });
+
+            if (filtered.length === 0) {
+                grid.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                return;
+            } else {
+                emptyState.classList.add('hidden');
+            }
+
+            grid.innerHTML = filtered.map(site => {
+                let statusBg = '';
+                let statusText = '';
+                let dotColor = '';
+
+                if (site.status === 'online') {
+                    statusBg = 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900';
+                    dotColor = 'bg-emerald-500';
+                    statusText = 'Онлайн';
+                } else if (site.status === 'offline') {
+                    statusBg = 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-400 border-rose-200 dark:border-rose-900';
+                    dotColor = 'bg-rose-500';
+                    statusText = 'Оффлайн';
+                } else {
+                    statusBg = 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border-amber-200 dark:border-amber-900';
+                    dotColor = 'bg-amber-500 animate-pulse';
+                    statusText = 'Проверка...';
+                }
+
+                const historyHtml = site.history.map(status => {
+                    let colorClass = 'bg-slate-200 dark:bg-slate-800';
+                    if (status === 'online') colorClass = 'bg-emerald-500 hover:bg-emerald-600';
+                    if (status === 'offline') colorClass = 'bg-rose-500 hover:bg-rose-600';
+                    return `<div class="h-4 flex-1 rounded-sm transition-colors ${colorClass}" title="${status}"></div>`;
+                }).join('');
+
+                return `
+                    <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-4">
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="flex items-center space-x-3 overflow-hidden">
+                                <div class="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex-shrink-0 flex items-center justify-center text-slate-600 dark:text-slate-300 font-bold text-sm">
+                                    ${escapeHtml(site.name.charAt(0).toUpperCase())}
+                                </div>
+                                <div class="overflow-hidden">
+                                    <h4 class="font-semibold text-slate-900 dark:text-white text-sm truncate" title="${escapeHtml(site.name)}">${escapeHtml(site.name)}</h4>
+                                    <a href="${escapeHtml(site.url)}" target="_blank" rel="noopener noreferrer" class="text-xs text-indigo-600 dark:text-indigo-400 hover:underline truncate block" title="${escapeHtml(site.url)}">${escapeHtml(site.url)}</a>
+                                </div>
+                            </div>
+                            
+                            <div class="px-2.5 py-1 rounded-full text-xs font-semibold border flex items-center space-x-1.5 flex-shrink-0 ${statusBg}">
+                                <span class="w-2 h-2 rounded-full ${dotColor}"></span>
+                                <span>${statusText}</span>
+                            </div>
+                        </div>
+
+                        <div class="space-y-3 bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-100 dark:border-slate-800/80">
+                            <div class="flex items-center justify-between text-xs">
+                                <span class="text-slate-500 dark:text-slate-400">Пинг / Отклик:</span>
+                                <span class="font-medium text-slate-700 dark:text-slate-300">${site.latency > 0 ? site.latency + ' мс' : '-'}</span>
+                            </div>
+                            <div class="flex items-center justify-between text-xs">
+                                <span class="text-slate-500 dark:text-slate-400">Проверка:</span>
+                                <span class="font-medium text-slate-700 dark:text-slate-300">${site.lastChecked}</span>
+                            </div>
+                            
+                            <div class="space-y-1 pt-1">
+                                <div class="flex justify-between text-[10px] text-slate-400">
+                                    <span>История (последние 10)</span>
+                                    <span>${site.status === 'online' ? 'Стабильно' : ''}</span>
+                                </div>
+                                <div class="flex space-x-1 w-full">
+                                    ${historyHtml}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between pt-1 gap-2">
+                            <div class="flex items-center space-x-1">
+                                <button type="button" onclick="pingSingleSite('${site.id}')" class="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-slate-700 transition-colors text-xs flex items-center space-x-1" title="Проверить">
+                                    <i class="fa-solid fa-rotate-right"></i>
+                                    <span class="hidden sm:inline">Пинг</span>
+                                </button>
+                                <button type="button" onclick="openEditModal('${site.id}')" class="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-slate-700 transition-colors text-xs" title="Изменить название/URL">
+                                    <i class="fa-solid fa-pen"></i>
+                                </button>
+                                <button type="button" onclick="deleteSite('${site.id}')" class="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-slate-700 transition-colors text-xs" title="Удалить">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </div>
+                            
+                            <a href="${escapeHtml(site.url)}" target="_blank" rel="noopener noreferrer" class="px-3 py-2 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900 transition-colors text-xs font-medium flex items-center space-x-1.5">
+                                <span>Открыть</span>
+                                <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+                            </a>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function escapeHtml(str) {
+            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
+
+        async function checkSite(id) {
+            const site = sites.find(s => s.id === id);
+            if (!site) return;
+
+            const startTime = performance.now();
+            let isOnline = false;
+            
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+                await fetch(site.url, {
+                    method: 'GET',
+                    mode: 'no-cors',
+                    cache: 'no-cache',
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+                isOnline = true;
+            } catch (err) {
+                isOnline = await new Promise((resolve) => {
+                    const img = new Image();
+                    const timer = setTimeout(() => {
+                        img.src = '';
+                        resolve(false);
+                    }, 5000);
+
+                    img.onload = () => {
+                        clearTimeout(timer);
+                        resolve(true);
+                    };
+                    img.onerror = () => {
+                        clearTimeout(timer);
+                        resolve(true); 
+                    };
+                    img.src = `${site.url.replace(/\/$/, '')}/favicon.ico?_=${Date.now()}`;
+                });
+            }
+
+            const endTime = performance.now();
+            const latency = Math.round(endTime - startTime);
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+            site.status = isOnline ? 'online' : 'offline';
+            site.latency = isOnline ? latency : 0;
+            site.lastChecked = timeStr;
+
+            site.history.push(site.status);
+            if (site.history.length > 10) site.history.shift();
+            saveHistory(site.id, site.history);
+
+            renderDashboard();
+        }
+
+        async function checkAllSites(manual = false) {
+            if (isCheckingAll) return;
+            isCheckingAll = true;
+
+            const refreshIcon = document.getElementById('refreshIcon');
+            if (refreshIcon) refreshIcon.classList.add('fa-spin');
+
+            if (manual) {
+                showToast('Запущена проверка всех сайтов...', 'info');
+            }
+
+            sites.forEach(s => s.status = 'checking');
+            renderDashboard();
+
+            await Promise.all(sites.map(s => checkSite(s.id)));
+
+            if (refreshIcon) refreshIcon.classList.remove('fa-spin');
+            isCheckingAll = false;
+            resetCountdown();
+
+            if (manual) {
+                showToast('Проверка завершена успешно!', 'success');
+            }
+        }
+
+        async function pingSingleSite(id) {
+            const site = sites.find(s => s.id === id);
+            if (!site) return;
+            showToast(`Проверка ${site.name}...`, 'info');
+            await checkSite(id);
+            showToast(`Пинг для ${site.name} завершен`, 'success');
+        }
+
+        function openAddModal() {
+            document.getElementById('modalTitle').innerText = "Добавить новый сайт";
+            document.getElementById('modalSiteId').value = "";
+            document.getElementById('modalInputName').value = "";
+            document.getElementById('modalInputUrl').value = "";
+            
+            const modal = document.getElementById('siteModal');
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                modal.querySelector('div').classList.remove('scale-95');
+            }, 10);
+        }
+
+        function openEditModal(id) {
+            const site = sites.find(s => s.id === id);
+            if (!site) return;
+
+            document.getElementById('modalTitle').innerText = "Изменить сайт";
+            document.getElementById('modalSiteId').value = site.id;
+            document.getElementById('modalInputName').value = site.name;
+            document.getElementById('modalInputUrl').value = site.url;
+            
+            const modal = document.getElementById('siteModal');
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modal.classList.remove('opacity-0');
+                modal.querySelector('div').classList.remove('scale-95');
+            }, 10);
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('siteModal');
+            modal.classList.add('opacity-0');
+            modal.querySelector('div').classList.add('scale-95');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 300);
+        }
+
+        function handleSiteFormSubmit(event) {
+            event.preventDefault();
+            const id = document.getElementById('modalSiteId').value;
+            const name = document.getElementById('modalInputName').value.trim();
+            const url = document.getElementById('modalInputUrl').value.trim();
+
+            if (!name || !url) return;
+
+            if (id) {
+                // Edit existing
+                const site = sites.find(s => s.id === id);
+                if (site) {
+                    site.name = name;
+                    site.url = url;
+                }
+                showToast('Сайт успешно обновлен', 'success');
+            } else {
+                // Add new
+                const newSite = {
+                    id: 'site_' + Date.now(),
+                    name: name,
+                    url: url,
+                    status: 'checking',
+                    latency: 0,
+                    statusCode: '-',
+                    lastChecked: '-',
+                    history: Array(10).fill('unknown')
+                };
+                sites.push(newSite);
+                showToast('Сайт успешно добавлен', 'success');
+                checkSite(newSite.id);
+            }
+
+            saveSitesToStorage();
+            closeModal();
+            renderDashboard();
+        }
+
+        function deleteSite(id) {
+            if (!confirm('Вы уверены, что хотите удалить этот сайт из мониторинга?')) return;
+            sites = sites.filter(s => s.id !== id);
+            localStorage.removeItem(`uptime_history_${id}`);
+            saveSitesToStorage();
+            renderDashboard();
+            showToast('Сайт удален', 'info');
+        }
+
+        function setFilter(filter) {
+            currentFilter = filter;
+            ['all', 'online', 'offline'].forEach(f => {
+                const btn = document.getElementById(`filterBtn-${f}`);
+                if (!btn) return;
+                if (f === filter) {
+                    btn.className = "flex-1 sm:flex-none px-4 py-1.5 text-xs font-semibold rounded-lg bg-white dark:bg-slate-700 shadow-sm transition-all text-indigo-600 dark:text-white";
+                } else {
+                    btn.className = "flex-1 sm:flex-none px-4 py-1.5 text-xs font-semibold rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all";
+                }
+            });
+            renderSitesGrid();
+        }
+
+        function filterSites() {
+            const searchInput = document.getElementById('searchInput');
+            if (searchInput) searchQuery = searchInput.value;
+            renderSitesGrid();
+        }
+
+        function formatTimeRemaining(totalSeconds) {
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = totalSeconds % 60;
+            if (minutes > 0) {
+                return `${minutes} мин ${seconds} с`;
+            }
+            return `${seconds} с`;
+        }
+
+        function startCountdown() {
+            if (countdownInterval) clearInterval(countdownInterval);
+            countdownInterval = setInterval(() => {
+                countdownTimer--;
+                if (countdownTimer <= 0) {
+                    checkAllSites(false);
+                } else {
+                    const el = document.getElementById('countdownText');
+                    if (el) el.innerText = `Обновление через ${formatTimeRemaining(countdownTimer)}`;
+                }
+            }, 1000);
+        }
+
+        function resetCountdown() {
+            countdownTimer = CHECK_INTERVAL_SECONDS;
+            const el = document.getElementById('countdownText');
+            if (el) el.innerText = `Обновление через ${formatTimeRemaining(countdownTimer)}`;
+        }
+
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toastMessage');
+            const toastIcon = document.getElementById('toastIcon');
+
+            if (!toast || !toastMessage || !toastIcon) return;
+
+            toastMessage.innerText = message;
+            if (type === 'success') {
+                toastIcon.className = "fa-solid fa-circle-check text-emerald-400 text-lg";
+            } else if (type === 'error') {
+                toastIcon.className = "fa-solid fa-circle-xmark text-rose-400 text-lg";
+            } else {
+                toastIcon.className = "fa-solid fa-circle-info text-indigo-400 text-lg";
+            }
+
+            toast.classList.remove('translate-y-24', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('translate-y-24', 'opacity-0');
+            }, 3000);
+        }
+
+        function toggleDarkMode() {
+            const html = document.documentElement;
+            const themeIcon = document.getElementById('themeIcon');
+            if (html.classList.contains('dark')) {
+                html.classList.remove('dark');
+                localStorage.setItem('theme', 'light');
+                if (themeIcon) themeIcon.className = "fa-solid fa-moon";
+            } else {
+                html.classList.add('dark');
+                localStorage.setItem('theme', 'dark');
+                if (themeIcon) themeIcon.className = "fa-solid fa-sun";
+            }
+        }
+
+        function initTheme() {
+            const savedTheme = localStorage.getItem('theme');
+            const themeIcon = document.getElementById('themeIcon');
+            if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+                if (themeIcon) themeIcon.className = "fa-solid fa-sun";
+            } else {
+                document.documentElement.classList.remove('dark');
+                if (themeIcon) themeIcon.className = "fa-solid fa-moon";
+            }
+        }
+
+        window.onload = function() {
+            initTheme();
+            initSites();
+            renderDashboard();
+            checkAllSites(false);
+            startCountdown();
+        };
+    </script>
+</body>
+</html>
