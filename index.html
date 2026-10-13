@@ -25,7 +25,6 @@
     <!-- FontAwesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        /* Custom scrollbar and animations */
         ::-webkit-scrollbar {
             width: 8px;
             height: 8px;
@@ -142,43 +141,68 @@
             </div>
         </div>
 
-        <div class="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
-            
-            <!-- Search & Filters -->
-            <div class="flex flex-col sm:flex-row items-center w-full md:w-auto gap-3">
-                <!-- Search Box -->
-                <div class="relative w-full sm:w-64">
-                    <span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
-                        <i class="fa-solid fa-search"></i>
-                    </span>
-                    <input type="text" id="searchInput" oninput="filterSites()" placeholder="Поиск по URL или названию..." 
-                        class="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white">
+        <div class="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+            <div class="flex flex-col lg:flex-row items-center justify-between gap-4">
+                
+                <!-- Search & Filters -->
+                <div class="flex flex-col sm:flex-row items-center w-full lg:w-auto gap-3 flex-wrap">
+                    <!-- Search Box -->
+                    <div class="relative w-full sm:w-64">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
+                            <i class="fa-solid fa-search"></i>
+                        </span>
+                        <input type="text" id="searchInput" oninput="filterSites()" placeholder="Поиск по URL или названию..." 
+                            class="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white">
+                    </div>
+
+                    <!-- Status Filter Buttons -->
+                    <div class="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl w-full sm:w-auto overflow-x-auto">
+                        <button onclick="setFilter('all')" id="filterBtn-all" class="flex-1 sm:flex-none px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-white dark:bg-slate-700 shadow-sm transition-all text-indigo-600 dark:text-white">Все</button>
+                        <button onclick="setFilter('online')" id="filterBtn-online" class="flex-1 sm:flex-none px-3.5 py-1.5 text-xs font-semibold rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all">Онлайн</button>
+                        <button onclick="setFilter('offline')" id="filterBtn-offline" class="flex-1 sm:flex-none px-3.5 py-1.5 text-xs font-semibold rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all">Оффлайн</button>
+                    </div>
+
+                    <!-- Domain Filter Dropdown -->
+                    <div class="w-full sm:w-auto">
+                        <select id="domainFilterSelect" onchange="filterSites()" class="w-full sm:w-auto px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <option value="all">Все домены (.ru)</option>
+                            <!-- Dynamically populated -->
+                        </select>
+                    </div>
                 </div>
 
-                <!-- Status Filter Buttons -->
-                <div class="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl w-full sm:w-auto overflow-x-auto">
-                    <button onclick="setFilter('all')" id="filterBtn-all" class="flex-1 sm:flex-none px-4 py-1.5 text-xs font-semibold rounded-lg bg-white dark:bg-slate-700 shadow-sm transition-all text-indigo-600 dark:text-white">Все</button>
-                    <button onclick="setFilter('online')" id="filterBtn-online" class="flex-1 sm:flex-none px-4 py-1.5 text-xs font-semibold rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all">Онлайн</button>
-                    <button onclick="setFilter('offline')" id="filterBtn-offline" class="flex-1 sm:flex-none px-4 py-1.5 text-xs font-semibold rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all">Оффлайн</button>
+                <!-- Actions & Auto-refresh -->
+                <div class="flex items-center justify-between w-full lg:w-auto gap-3">
+                    <div class="flex items-center space-x-2 text-xs text-slate-500 dark:text-slate-400">
+                        <i class="fa-regular fa-clock"></i>
+                        <span id="countdownText">Обновление через 30 мин</span>
+                    </div>
+
+                    <div class="flex items-center space-x-2">
+                        <button onclick="openAddModal()" class="flex items-center space-x-2 px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-sm font-medium transition-all">
+                            <i class="fa-solid fa-plus"></i>
+                            <span class="hidden sm:inline">Добавить</span>
+                        </button>
+                        <button onclick="checkAllSites(true)" id="refreshBtn" class="flex items-center space-x-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-medium shadow-lg shadow-indigo-600/25 transition-all active:scale-95">
+                            <i id="refreshIcon" class="fa-solid fa-rotate"></i>
+                            <span>Проверить</span>
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            <!-- Actions & Auto-refresh -->
-            <div class="flex items-center justify-between w-full md:w-auto gap-3">
-                <div class="flex items-center space-x-2 text-xs text-slate-500 dark:text-slate-400">
-                    <i class="fa-regular fa-clock"></i>
-                    <span id="countdownText">Обновление через 30 мин</span>
-                </div>
-
+            <!-- Sub-bar for Sorting Options -->
+            <div class="flex flex-wrap items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800 text-xs text-slate-500 dark:text-slate-400 gap-3">
                 <div class="flex items-center space-x-2">
-                    <button onclick="openAddModal()" class="flex items-center space-x-2 px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl text-sm font-medium transition-all">
-                        <i class="fa-solid fa-plus"></i>
-                        <span class="hidden sm:inline">Добавить</span>
-                    </button>
-                    <button onclick="checkAllSites(true)" id="refreshBtn" class="flex items-center space-x-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-medium shadow-lg shadow-indigo-600/25 transition-all active:scale-95">
-                        <i id="refreshIcon" class="fa-solid fa-rotate"></i>
-                        <span>Проверить</span>
-                    </button>
+                    <span class="font-medium text-slate-700 dark:text-slate-300"><i class="fa-solid fa-arrow-down-wide-short mr-1"></i> Сортировка:</span>
+                    <div class="flex items-center space-x-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
+                        <button onclick="setSort('name')" id="sortBtn-name" class="px-3 py-1 rounded-md font-medium bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-white transition-all">По имени</button>
+                        <button onclick="setSort('latency')" id="sortBtn-latency" class="px-3 py-1 rounded-md font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 transition-all">По отклику (пинг)</button>
+                        <button onclick="setSort('status')" id="sortBtn-status" class="px-3 py-1 rounded-md font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 transition-all">По статусу</button>
+                    </div>
+                </div>
+                <div id="activeFiltersSummary" class="text-slate-400 italic">
+                    Показано сайтов: <span id="filteredCount">0</span> из <span id="totalCount">0</span>
                 </div>
             </div>
         </div>
@@ -198,7 +222,6 @@
 
     </main>
 
-    <!-- Modal: Add / Edit Site -->
     <div id="siteModal" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm hidden opacity-0 transition-opacity duration-300">
         <div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 w-full max-w-md p-6 shadow-2xl transform scale-95 transition-transform duration-300">
             <div class="flex items-center justify-between mb-4">
@@ -257,6 +280,8 @@
 
         let sites = [];
         let currentFilter = 'all';
+        let currentDomainFilter = 'all';
+        let currentSort = 'name'; // 'name', 'latency', 'status'
         let searchQuery = '';
         
         // 30 minutes in seconds = 30 * 60 = 1800 seconds
@@ -268,7 +293,7 @@
         function initSites() {
             let loadedSites = [];
             try {
-                const stored = localStorage.getItem('uptime_custom_sites_v3');
+                const stored = localStorage.getItem('uptime_custom_sites_v4');
                 if (stored) {
                     loadedSites = JSON.parse(stored);
                 }
@@ -301,12 +326,42 @@
                 };
             });
             saveSitesToStorage();
+            populateDomainDropdown();
+        }
+
+        function extractDomain(urlStr) {
+            try {
+                const parsed = new URL(urlStr);
+                return parsed.hostname;
+            } catch(e) {
+                return urlStr.split('/')[2] || urlStr;
+            }
+        }
+
+        function populateDomainDropdown() {
+            const select = document.getElementById('domainFilterSelect');
+            if (!select) return;
+
+            // Extract unique domains
+            const domainsSet = new Set();
+            sites.forEach(s => {
+                const domain = extractDomain(s.url);
+                if (domain) domainsSet.add(domain);
+            });
+
+            const currentVal = select.value;
+            let optionsHtml = '<option value="all">Все домены / хосты</option>';
+            Array.from(domainsSet).sort().forEach(domain => {
+                optionsHtml += `<option value="${domain}">${domain}</option>`;
+            });
+            select.innerHTML = optionsHtml;
+            select.value = domainsSet.has(currentVal) ? currentVal : 'all';
         }
 
         function saveSitesToStorage() {
             try {
                 const lightweight = sites.map(s => ({ id: s.id, name: s.name, url: s.url }));
-                localStorage.setItem('uptime_custom_sites_v3', JSON.stringify(lightweight));
+                localStorage.setItem('uptime_custom_sites_v4', JSON.stringify(lightweight));
             } catch(e) {}
         }
 
@@ -342,12 +397,44 @@
             const grid = document.getElementById('sitesGrid');
             const emptyState = document.getElementById('emptyState');
             
+            // 1. Filter by status, search, domain
             let filtered = sites.filter(site => {
                 const matchesSearch = site.url.toLowerCase().includes(searchQuery.toLowerCase()) || site.name.toLowerCase().includes(searchQuery.toLowerCase());
-                if (currentFilter === 'online') return matchesSearch && site.status === 'online';
-                if (currentFilter === 'offline') return matchesSearch && site.status === 'offline';
-                return matchesSearch;
+                
+                let matchesStatus = true;
+                if (currentFilter === 'online') matchesStatus = (site.status === 'online');
+                if (currentFilter === 'offline') matchesStatus = (site.status === 'offline');
+
+                let matchesDomain = true;
+                if (currentDomainFilter !== 'all') {
+                    const siteDomain = extractDomain(site.url);
+                    matchesDomain = (siteDomain === currentDomainFilter);
+                }
+
+                return matchesSearch && matchesStatus && matchesDomain;
             });
+
+            // 2. Sort sites
+            filtered.sort((a, b) => {
+                if (currentSort === 'name') {
+                    return a.name.localeCompare(b.name, 'ru');
+                } else if (currentSort === 'latency') {
+                    // Put offline/checking at the end, sort online by latency ascending
+                    const latA = a.status === 'online' ? a.latency : 999999;
+                    const latB = b.status === 'online' ? b.latency : 999999;
+                    return latA - latB;
+                } else if (currentSort === 'status') {
+                    const rank = { online: 1, checking: 2, offline: 3 };
+                    return (rank[a.status] || 2) - (rank[b.status] || 2);
+                }
+                return 0;
+            });
+
+            // Update counter labels
+            const filteredCountEl = document.getElementById('filteredCount');
+            const totalCountEl = document.getElementById('totalCount');
+            if (filteredCountEl) filteredCountEl.innerText = filtered.length;
+            if (totalCountEl) totalCountEl.innerText = sites.length;
 
             if (filtered.length === 0) {
                 grid.innerHTML = '';
@@ -613,6 +700,7 @@
             }
 
             saveSitesToStorage();
+            populateDomainDropdown();
             closeModal();
             renderDashboard();
         }
@@ -622,6 +710,7 @@
             sites = sites.filter(s => s.id !== id);
             localStorage.removeItem(`uptime_history_${id}`);
             saveSitesToStorage();
+            populateDomainDropdown();
             renderDashboard();
             showToast('Сайт удален', 'info');
         }
@@ -632,9 +721,23 @@
                 const btn = document.getElementById(`filterBtn-${f}`);
                 if (!btn) return;
                 if (f === filter) {
-                    btn.className = "flex-1 sm:flex-none px-4 py-1.5 text-xs font-semibold rounded-lg bg-white dark:bg-slate-700 shadow-sm transition-all text-indigo-600 dark:text-white";
+                    btn.className = "flex-1 sm:flex-none px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-white dark:bg-slate-700 shadow-sm transition-all text-indigo-600 dark:text-white";
                 } else {
-                    btn.className = "flex-1 sm:flex-none px-4 py-1.5 text-xs font-semibold rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all";
+                    btn.className = "flex-1 sm:flex-none px-3.5 py-1.5 text-xs font-semibold rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all";
+                }
+            });
+            renderSitesGrid();
+        }
+
+        function setSort(sortType) {
+            currentSort = sortType;
+            ['name', 'latency', 'status'].forEach(s => {
+                const btn = document.getElementById(`sortBtn-${s}`);
+                if (!btn) return;
+                if (s === sortType) {
+                    btn.className = "px-3 py-1 rounded-md font-medium bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-white transition-all";
+                } else {
+                    btn.className = "px-3 py-1 rounded-md font-medium text-slate-600 dark:text-slate-400 hover:text-slate-900 transition-all";
                 }
             });
             renderSitesGrid();
@@ -643,6 +746,10 @@
         function filterSites() {
             const searchInput = document.getElementById('searchInput');
             if (searchInput) searchQuery = searchInput.value;
+            
+            const domainSelect = document.getElementById('domainFilterSelect');
+            if (domainSelect) currentDomainFilter = domainSelect.value;
+
             renderSitesGrid();
         }
 
