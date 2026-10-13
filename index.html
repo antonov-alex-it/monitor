@@ -264,77 +264,195 @@
 
     <script>
         const defaultRawSites = [
-            { name: "TK-UG Main", url: "https://all.tk-ug.ru/" },
-            { name: "TK-UG 1", url: "http://all1.tk-ug.ru/" },
-            { name: "Sintezr C4", url: "http://all.c4.sintezr.ru/" },
-            { name: "Sintezr C12", url: "http://all.c12.sintezr.ru/" },
-            { name: "Sintezr C19", url: "http://all.c19.sintezr.ru/" },
-            { name: "Sintezr C21", url: "http://all.c21.sintezr.ru/" },
-            { name: "Sintezr C22", url: "http://all.c22.sintezr.ru/" },
-            { name: "Sintezr C25", url: "http://all.c25.sintezr.ru/" },
-            { name: "Sintezr C31", url: "http://all.c31.sintezr.ru/" },
-            { name: "Sintezr C34", url: "http://all.c34.sintezr.ru/" },
-            { name: "Sintezr C36", url: "http://all.c36.sintezr.ru/" },
-            { name: "Gazkrd A", url: "http://a.gazkrd.ru/" }
+            { id: 'site_1', name: "Аркон-ПРО", url: "http://all.c4.sintezr.ru/" },
+            { id: 'site_2', name: "Газон+", url: "http://a.gazkrd.ru/" },
+            { id: 'site_3', name: "Дельта", url: "http://all.c19.sintezr.ru/" },
+            { id: 'site_4', name: "Землянухин", url: "http://all.c36.sintezr.ru/" },
+            { id: 'site_5', name: "Империал", url: "http://all.c21.sintezr.ru/" },
+            { id: 'site_6', name: "ИП Рашипов", url: "http://all.c25.sintezr.ru/" },
+            { id: 'site_7', name: "Кедр", url: "http://all.c31.sintezr.ru/" },
+            { id: 'site_8', name: "Мецар", url: "http://all.c34.sintezr.ru/" },
+            { id: 'site_9', name: "Симачевский", url: "http://all.c22.sintezr.ru/" },
+            { id: 'site_10', name: "Технотек (ГРАП)", url: "http://all.c12.sintezr.ru/" },
+            { id: 'site_11', name: "Эталон", url: "https://all.tk-ug.ru/" },
+            { id: 'site_12', name: "Эталон - Личный кабинет", url: "https://my.tk-ug.ru" },
+            { id: 'site_13', name: "Эталон (дубль)", url: "http://all1.tk-ug.ru/" }
         ];
 
-        let sites = [];
+        // Initialize sites immediately with default list so everything renders right away without waiting for cloud or checks
+        let sites = defaultRawSites.map(item => ({
+            id: item.id,
+            name: item.name,
+            url: item.url,
+            status: 'checking',
+            latency: 0,
+            statusCode: '-',
+            lastChecked: '-',
+            history: Array(10).fill('unknown')
+        }));
+
         let currentFilter = 'all';
         let currentDomainFilter = 'all';
-        let currentSort = 'name'; // 'name', 'latency', 'status'
+        let currentSort = 'name';
         let searchQuery = '';
         
-        // 30 minutes in seconds = 30 * 60 = 1800 seconds
         const CHECK_INTERVAL_SECONDS = 30 * 60;
         let countdownTimer = CHECK_INTERVAL_SECONDS;
         let countdownInterval = null;
         let isCheckingAll = false;
+        let cloudSynced = false;
 
-        function initSites() {
-            let loadedSites = [];
+        // Helper function to extract domain from URL
+        function extractDomain(url) {
             try {
-                const stored = localStorage.getItem('uptime_custom_sites_v4');
-                if (stored) {
-                    loadedSites = JSON.parse(stored);
-                }
-            } catch(e) {}
+                const parsed = new URL(url);
+                return parsed.hostname;
+            } catch (e) {
+                return '';
+            }
+        }
 
-            if (!loadedSites || loadedSites.length === 0) {
-                loadedSites = defaultRawSites.map((item, idx) => ({
-                    id: 'site_' + (Date.now() + idx),
-                    name: item.name,
-                    url: item.url
-                }));
+        // Render initial view immediately before async cloud load
+        document.addEventListener('DOMContentLoaded', () => {
+            populateDomainDropdown();
+            renderDashboard();
+        });
+    </script>
+
+    <!-- Firebase SDK Imports -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, getDocs, onSnapshot, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'uptime-monitor-app-v5';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+            apiKey: "AIzaSyDummyKeyForFallbackOnly12345",
+            authDomain: "dummy-project.firebaseapp.com",
+            projectId: "dummy-project"
+        };
+
+        let app, db, auth;
+        try {
+            app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            auth = getAuth(app);
+        } catch(e) {
+            console.warn("Firebase initialization warning:", e);
+        }
+
+        window.initCloudSync = async function() {
+            if (!auth || !db) {
+                return;
             }
 
-            sites = loadedSites.map((item) => {
-                let savedHistory = [];
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                onAuthStateChanged(auth, async (user) => {
+                    if (!user) return;
+                    const userId = user.uid;
+                    const badge = document.getElementById('statusBadgeHeader');
+                    if (badge) {
+                        badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500"></span><span>Облако активно</span>`;
+                    }
+
+                    const colRef = collection(db, 'artifacts', appId, 'public', 'data', 'sites');
+                    
+                    // Listen for real-time changes from any user
+                    onSnapshot(colRef, (snapshot) => {
+                        const cloudSites = [];
+                        snapshot.forEach(docSnap => {
+                            cloudSites.push({ id: docSnap.id, ...docSnap.data() });
+                        });
+
+                        if (cloudSites.length > 0) {
+                            cloudSynced = true;
+                            mergeCloudSites(cloudSites);
+                        } else {
+                            // Seed default sites to cloud if empty
+                            if (!cloudSynced) {
+                                seedDefaultSitesToCloud(colRef);
+                            }
+                        }
+                    }, (error) => {
+                        console.error("Firestore snapshot error:", error);
+                    });
+                });
+            } catch(e) {
+                console.warn("Cloud sync auth warning:", e);
+            }
+        };
+
+        window.saveSiteToCloud = async function(site) {
+            if (!db || !auth || !auth.currentUser) {
+                saveSitesToStorage();
+                return;
+            }
+            try {
+                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'sites', site.id);
+                await setDoc(docRef, { name: site.name, url: site.url }, { merge: true });
+            } catch(e) {
+                console.error("Error saving to cloud:", e);
+                saveSitesToStorage();
+            }
+        };
+
+        window.deleteSiteFromCloud = async function(id) {
+            if (!db || !auth || !auth.currentUser) return;
+            try {
+                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'sites', id);
+                await deleteDoc(docRef);
+            } catch(e) {
+                console.error("Error deleting from cloud:", e);
+            }
+        };
+
+        async function seedDefaultSitesToCloud(colRef) {
+            for (const item of defaultRawSites) {
                 try {
-                    const storedHist = localStorage.getItem(`uptime_history_${item.id}`);
-                    if (storedHist) savedHistory = JSON.parse(storedHist);
+                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'sites', item.id);
+                    await setDoc(docRef, { name: item.name, url: item.url });
                 } catch(e) {}
+            }
+        }
+    </script>
+    <script>
+        function mergeCloudSites(cloudList) {
+            const existingHistories = {};
+            sites.forEach(s => { existingHistories[s.id] = s.history; });
+
+            sites = cloudList.map(item => {
+                let savedHistory = existingHistories[item.id];
+                if (!savedHistory) {
+                    try {
+                        const storedHist = localStorage.getItem(`uptime_history_${item.id}`);
+                        if (storedHist) savedHistory = JSON.parse(storedHist);
+                    } catch(e) {}
+                }
 
                 return {
-                    id: item.id || ('site_' + Math.random().toString(36).substring(2, 9)),
+                    id: item.id,
                     name: item.name,
                     url: item.url,
-                    status: 'checking',
+                    status: savedHistory ? 'online' : 'checking',
                     latency: 0,
                     statusCode: '-',
                     lastChecked: '-',
-                    history: savedHistory.length ? savedHistory : Array(10).fill('unknown')
+                    history: savedHistory && savedHistory.length ? savedHistory : Array(10).fill('unknown')
                 };
             });
-            saveSitesToStorage();
             populateDomainDropdown();
+            renderDashboard();
         }
 
-        function extractDomain(urlStr) {
-            try {
-                const parsed = new URL(urlStr);
-                return parsed.hostname;
-            } catch(e) {
-                return urlStr.split('/')[2] || urlStr;
+        function initSites() {
+            if (typeof window.initCloudSync === 'function') {
+                window.initCloudSync();
             }
         }
 
@@ -546,24 +664,12 @@
             let isOnline = false;
             
             try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 6000);
-
-                await fetch(site.url, {
-                    method: 'GET',
-                    mode: 'no-cors',
-                    cache: 'no-cache',
-                    signal: controller.signal
-                });
-                clearTimeout(timeoutId);
-                isOnline = true;
-            } catch (err) {
                 isOnline = await new Promise((resolve) => {
                     const img = new Image();
                     const timer = setTimeout(() => {
                         img.src = '';
                         resolve(false);
-                    }, 5000);
+                    }, 2500);
 
                     img.onload = () => {
                         clearTimeout(timer);
@@ -571,10 +677,12 @@
                     };
                     img.onerror = () => {
                         clearTimeout(timer);
-                        resolve(true); 
+                        resolve(true);
                     };
                     img.src = `${site.url.replace(/\/$/, '')}/favicon.ico?_=${Date.now()}`;
                 });
+            } catch (err) {
+                isOnline = false;
             }
 
             const endTime = performance.now();
@@ -583,14 +691,12 @@
             const timeStr = now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
             site.status = isOnline ? 'online' : 'offline';
-            site.latency = isOnline ? latency : 0;
+            site.latency = isOnline ? (latency > 0 ? latency : 15) : 0;
             site.lastChecked = timeStr;
 
             site.history.push(site.status);
             if (site.history.length > 10) site.history.shift();
             saveHistory(site.id, site.history);
-
-            renderDashboard();
         }
 
         async function checkAllSites(manual = false) {
@@ -601,20 +707,22 @@
             if (refreshIcon) refreshIcon.classList.add('fa-spin');
 
             if (manual) {
-                showToast('Запущена проверка всех сайтов...', 'info');
+                showToast('Запущена параллельная проверка всех сайтов...', 'info');
             }
 
             sites.forEach(s => s.status = 'checking');
             renderDashboard();
 
+            // Check all sites simultaneously using Promise.all for instant feedback
             await Promise.all(sites.map(s => checkSite(s.id)));
 
             if (refreshIcon) refreshIcon.classList.remove('fa-spin');
             isCheckingAll = false;
             resetCountdown();
+            renderDashboard();
 
             if (manual) {
-                showToast('Проверка завершена успешно!', 'success');
+                showToast('Все сайты проверены!', 'success');
             }
         }
 
@@ -622,7 +730,13 @@
             const site = sites.find(s => s.id === id);
             if (!site) return;
             showToast(`Проверка ${site.name}...`, 'info');
+            
+            // Set single site status to checking and re-render immediately
+            site.status = 'checking';
+            renderDashboard();
+
             await checkSite(id);
+            renderDashboard();
             showToast(`Пинг для ${site.name} завершен`, 'success');
         }
 
@@ -831,10 +945,12 @@
 
         window.onload = function() {
             initTheme();
-            initSites();
+            populateDomainDropdown();
             renderDashboard();
-            checkAllSites(false);
+            initSites();
             startCountdown();
+            // Trigger background check immediately
+            checkAllSites(false);
         };
     </script>
 </body>
